@@ -1,134 +1,121 @@
-# 💻 CS40 Homework Assignment – Universal Machine Emulator (C)
+# 💻 CS40 Homework Assignment – filesofpix (Corrupted PGM Restoration in C)
 
-This repository contains my solution to Homework 6 for CS40 (Machine Structure and Assembly Language Programming), a course I completed at Tufts University. The assignment focused on building a Universal Machine (UM) emulator in C that supports segmented memory, register-based instructions, and efficient execution of UM programs.
+This repository contains my solution to the **filesofpix** assignment for CS40 (Machine Structure and Assembly Language Programming), a course I completed at Tufts University. The assignment focused on restoring corrupted PGM image files by parsing infusion sequences and digit sequences using Hanson data structures and outputting the original PGM image.
 
 ---
 
 ## 📚 Topics Covered
 
-- Emulating a register-based Universal Machine (UM)
-- Implementing segmented memory with mapping and unmapping
-- Bit-packing and instruction decoding
-- Switch-case dispatch for opcode execution
-- Efficient memory management with UArrays and sequences
-- Assertion-based error handling for invalid operations
-- Performance optimization techniques for large instruction counts
+- Parsing dynamic-length lines from files with safe reallocation  
+- Splitting lines into digit and infusion sequences  
+- Using Hanson’s Table, Seq, and Atom modules for efficient key-value mapping  
+- Reconstructing original pixel data by detecting repeated infusion keys  
+- Printing valid PGM files with correct headers and pixel data  
+- Careful memory management and cleanup of dynamically allocated buffers  
+- Integration with the PNM Reader library for reading image metadata
 
 ---
 
 ## 📂 Repository Contents
-
-| File           | Description                                |
-| -------------- | ------------------------------------------ |
-| `um.c`         | Main program reader and entrypoint         |
-| `um_driver.c`  | Core UM runtime, command execution logic   |
-| `segments.c`   | Segmented memory implementation            |
-| `segments.h`   | Header for segmented memory module         |
-| `callmain.ums` | μASM file to call main and halt (provided) |
-| `printd.ums`   | μASM helper to print integers (provided)   |
-| `urt0.ums`     | μASM stack initialization (provided)       |
-| `Makefile`     | Build configuration                        |
-| `.gitignore`   | Ignore build artifacts and temp files      |
-| `README.md`    | This file                                  |
+| File            | Description                                 |
+|-----------------|---------------------------------------------|
+| `filesofpix.c`  | Main program for corrupted PGM restoration |
+| `readaline.c`   | Reads a single line from input dynamically  |
+| `parsealine.c`  | Parses lines into digit and infusion sequences |
+| `tablecompare.c`| Inserts infusion-digit pairs into Hanson Table |
+| `printpgm.c`    | Prints restored PGM file output              |
+| `table.h`       | Hanson Table data structure header           |
+| `seq.h`         | Hanson Seq data structure header             |
+| `atom.h`        | Hanson Atom data structure header            |
+| `except.h`      | Hanson exception handling utilities          |
+| `Makefile`      | Build configuration                           |
+| `.gitignore`    | Ignore build artifacts and temp files        |
+| `README.md`     | This file                                     |
 
 ---
 
-## ▶️ Running the UM Emulator
+## ▶️ Running the filesofpix Program
 
 ### 🛠 Requirements
 
-- GCC or compatible C compiler
-- Tufts CS40 support files: uarray.h, seq.h, bitpack.h, atom.h, table.h, etc.
+- GCC or compatible C compiler  
+- Hanson CS40 support files: `table.h`, `seq.h`, `atom.h`, `except.h`  
 - Standard POSIX environment
 
 ### 🔧 Build & Run
-
 ```bash
 make
-./um hello.um
+./filesofpix corrupted.pgm > restored.pgm
 ```
 
-Replace hello.um with any valid UM program file. The emulator reads the program, initializes segmented memory, and executes instructions until halt or program end.
+Replace corrupted.pgm with your corrupted PGM filename. The program reads the corrupted file, reconstructs the original pixel data, and writes a valid raw PGM image to standard output.
 
 ---
 
 ## 🏗 Architecture Overview
 
-`um.c`
+**`filesofpix.c`**
 
-- Reads a .um file, converts its contents into 32-bit words using UArray_T
-- Passes the program array to run() to start emulation
+- Opens input file or reads from stdin  
+- Repeatedly reads lines dynamically using `readaline()`  
+- Parses each line into digit and infusion sequences with `parsealine()`  
+- Uses `tablecompare()` to insert infusion-digit pairs into a Hanson Table, tracking duplicates to identify original pixel lines  
+- Collects all original lines in a Hanson Seq sequence  
+- Outputs restored PGM data with correct headers using `printpgm()`  
+- Frees all dynamically allocated memory with `free_mem()`
 
-`um_driver.c`
+**`readaline.c`**
 
-- Implements the main UM runtime loop and instruction execution
-- Maintains program counter, registers array, and segmented memory instance
-- Uses a switch statement for fast opcode dispatch
-- Implements each opcode command (conditional_move, segmented_load, halt, etc.) as an inline function
-- Uses assertions to catch invalid register indices and illegal operations
+- Reads an entire line from input, dynamically resizing buffer as needed to handle arbitrary line lengths  
+- Returns the length of the line or zero on EOF
 
-`segments.c`
+**`parsealine.c`**
 
-- Implements segmented memory as a table mapping segment IDs to UArray_T sequences of 32-bit words
-- Tracks unmapped segment IDs for reuse, avoiding ID exhaustion
-- Supports mapping new zero-initialized segments and unmapping existing ones
-- Provides word-level load and store functions with bounds checking
-- Manages segment 0 specially as the currently running program segment
-- Includes cleanup functions to free individual and all segments from memory safely
+- Splits a line into two arrays: digits (pixel values) and infusion characters (whitespace and other separators)  
+- Adds these parsed arrays to sequences for later cleanup
 
----
+**`tablecompare.c`**
 
-## 🧪 Test Programs Included (umtests/)
+- Uses Hanson Atoms to create keys from infusion sequences  
+- Inserts key-value pairs into a Hanson Table, where values are digit arrays  
+- Tracks original lines when duplicate keys appear
 
-| Test Name       | Description                                     |
-| --------------- | ----------------------------------------------- |
-| `halt.um`       | Tests halt instruction stops execution          |
-| `load_val.um`   | Tests loading immediate values into registers   |
-| `output.um`     | Tests character output via the output opcode    |
-| `add.um`        | Tests basic addition instruction                |
-| `map1.um`       | Tests segment mapping                           |
-| `input.um`      | Tests input instruction and EOF handling        |
-| `operations.um` | Tests combined instruction set with various ops |
+**`printpgm.c`**
 
----
+- Prints PGM header: magic number, width, height, and max grayscale value  
+- Prints pixel data lines as ASCII characters
 
-## ⏳ Performance
+**`free_mem()`**
 
-- Initial design using sequences for segments was too slow on large inputs
-- Refactored to use UArray_T for segments to reduce overhead
-- Optimized mapping/unmapping logic and segment copying using UArray_copy
-- Switching from sequences to arrays for registers improved speed
-- Using switch-case instead of function pointers sped up opcode dispatch
-- Example: Emulator ran 50 million instructions in approximately 27 hours and 47 minutes on a midmark.um test
+- Frees all allocated memory for sequences, tables, and buffers to prevent leaks
 
 ---
 
-## 🕒 Time Spent
+## 🧪 Testing & Validation
 
-- Analyzing the assignment: ~3 hours
-- Preparing design and architecture: ~10 hours
-- Implementation and debugging: ~20 hours
+- Tested with multiple corrupted PGM files  
+- Verified output files load correctly in standard PGM viewers  
+- Checked memory usage with valgrind to ensure no leaks
 
 ---
 
 ## 🧠 What I Learned
 
-- Implementing a complex virtual machine architecture in C
-- Designing and managing segmented memory with dynamic allocation and reuse
-- Low-level bit manipulation for instruction decoding
-- Balancing code correctness with runtime performance optimizations
-- Using assertions effectively to detect and prevent invalid operations
-- Modular program design separating memory management and execution logic
+- Efficiently parsing and handling arbitrary-length input lines in C  
+- Using Hanson’s data structures to solve non-trivial mapping problems  
+- Reconstructing image files from partial and corrupted data  
+- Writing robust C code with proper error checking and memory management  
+- Handling PGM file format details and pixel output formatting
 
 ---
 
 ## 🏫 About the Course
 
-CS40: Machine Structure and Assembly Language Programming,
+CS40: Machine Structure and Assembly Language Programming,  
 Tufts University – Fall 2023
 
 ---
 
-## 📄 License
+## 📄 License  
 
 This code was developed as part of an academic assignment and is shared for educational purposes only. Please do not plagiarize. Contact me if you'd like to discuss or learn more about this project.
