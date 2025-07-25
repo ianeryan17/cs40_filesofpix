@@ -1,0 +1,8 @@
+List of testing strategies used:
+- tested readaline on empty file, file with three lines, primarily to see if the loop would terminate properly on reaching EOF
+- after first full implementation of parsealine, tested a text file with one line through readaline and parsealine, which caused our program to segfault initially
+- once we rewrote our parsealine to work for the first test, we then added a line of only digits, which caused some more problems (segfaults, odd debug prints)
+- we restructured parseline to keep track of the lengths of digits and infusion to keep track of the length of the strings and insert exactly at those indexes to avoid concatenation.
+    - we tested this with the same parsealine test from earlier
+- we changed from fgets to fgetc to clean up our readline implementation
+    - we then tested this function to ensure it would work with our already implemented functions
